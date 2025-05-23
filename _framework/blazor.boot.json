@@ -1,7 +1,7 @@
 {
   "entryAssembly": "IRBSpeedApp",
   "resources": {
-    "hash": "sha256-uZ7qL5auULDTEmlOJp7mduNyISmNq+MBLN9LJfNJF0o=",
+    "hash": "sha256-icgXt8HajYQINZyKwlV8EKSWpT8aBw6Q4ClwZnxeNRA=",
     "runtime": {
       "dotnet.js": "sha256-eaJTmow4t8eE7FZMZR5Ja41JMOefGCbIYDTdpclGsac=",
       "dotnet.timezones.blat": "sha256-gbATD5HDsHYtW8vdPYh9iSBY4O5CjvMeCSF5xXWF1xo=",
@@ -12,7 +12,7 @@
     },
     "coreAssembly": {},
     "assembly": {
-      "IRBSpeedApp.dll": "sha256-w5GRWBdJpYFk+5PFvo4ob7o+PR8S0c0/JYEHxSHjbeE=",
+      "IRBSpeedApp.dll": "sha256-eVhzlRgZgtvtDS6etP1K2DkmwvMJ4C6dfdFS+aa8S8E=",
       "Microsoft.AspNetCore.Components.dll": "sha256-QQrA2UkO3trhouRmvGhKcVE+dYHTZULK400y2oQSvEg=",
       "Microsoft.AspNetCore.Components.Forms.dll": "sha256-dU0dEyX44zVxcO0S9qwuaqx+EHPgmadsdSLMuOIqpNY=",
       "Microsoft.AspNetCore.Components.Web.dll": "sha256-EPQWRcaTExk+EtAGVyxC8cl4vhg0VPSl0x3QdPs9LXw=",
@@ -43,7 +43,7 @@
       "System.Net.Http.Json.dll": "sha256-XhabPHlmnibWPgNMMpu5ZXOg4caa2snPNOA1s8HiDYM=",
       "System.Net.Primitives.dll": "sha256-hqakeXMK2G7A7GgHGOHJ64E9T3UK56M5o7LSbxOau6I=",
       "System.ObjectModel.dll": "sha256-VqkkBT4QvuO69Ywkoi+k+HeKncDhkVpssR3Q05FEzHQ=",
-      "System.Private.CoreLib.dll": "sha256-q0UrFb9zg36y4sxG977NLq/No9wqfjR2aGGXAT6jzPs=",
+      "System.Private.CoreLib.dll": "sha256-qVuutT3KTleKPHAaigg0YKchwiaVZwL0/UAReA3IsgY=",
       "System.Private.Uri.dll": "sha256-ndp1ULri5r1VWd9Yl7+jBeQK8qoQ9AYOAYQIXC0ITQQ=",
       "System.Runtime.dll": "sha256-MoGJzo5CRgdmWOdY5JCGW34Zbwzm4RZsA9QatvG1A90=",
       "System.Runtime.InteropServices.JavaScript.dll": "sha256-rzpGyyjUL4+ASZ1bvIB8FMdD4b4OhvCXv9OBEwDVUVM=",
