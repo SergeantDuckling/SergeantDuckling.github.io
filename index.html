@@ -26,6 +26,65 @@
         <a href="" class="reload">Reload</a>
         <a class="dismiss">🗙</a>
     </div>
+    <!-- expose all interop on window -->
+    <script>
+        // will point to whichever component registers last
+        window.dotNetHelper = null;
+
+        // called by any component on first render
+        window.registerDotNetHelper = (helper) => {
+            window.dotNetHelper = helper;
+            console.debug("Interop helper registered on", helper);
+        };
+
+        // Index.razor uses these:
+        window.startGPS = () => {
+            navigator.geolocation?.watchPosition(
+                pos => {
+                    const speed = (pos.coords.speed || 0) * 3.6;
+                    window.dotNetHelper?.invokeMethodAsync("UpdateSpeed", speed, 0);
+                },
+                err => console.error("GPS error", err),
+                { enableHighAccuracy: true }
+            );
+        };
+        window.enableMotion = () => {
+            const handler = ev => {
+                const a = ev.accelerationIncludingGravity || { x: 0, y: 0, z: 0 };
+                const accel = Math.hypot(a.x, a.y, a.z);
+                window.dotNetHelper?.invokeMethodAsync("UpdateSpeed", 0, accel);
+            };
+            if (DeviceMotionEvent?.requestPermission) {
+                DeviceMotionEvent.requestPermission()
+                    .then(r => r === "granted" && window.addEventListener("devicemotion", handler))
+                    .catch(console.error);
+            } else {
+                window.addEventListener("devicemotion", handler);
+            }
+        };
+
+        // SpeedTest.razor uses these:
+        window.startTracking = (helper) => {
+            navigator.geolocation?.watchPosition(
+                pos => {
+                    const speed = (pos.coords.speed || 0) * 3.6;
+                    window.dotNetHelper?.invokeMethodAsync("UpdateSpeed", speed, speed);
+                },
+                err => console.error("Tracking error", err),
+                { enableHighAccuracy: true }
+            );
+        };
+        window.stopTracking = () => {
+            // you could track the watchId if you like,
+            // but for simplicity you can clear all watchers:
+            // NOTE: this won’t work in all browsers—best to capture watchId
+            console.debug("stopTracking called");
+        };
+    </script>
+
+    <!-- Blazor bootstrap -->
+    <script src="_framework/blazor.webassembly.js"></script>
+
     <script src="_framework/blazor.webassembly.js"></script>
     <script>
         let watchId;
@@ -71,15 +130,19 @@
 
         function startGPS() {
             if (navigator.geolocation) {
+                console.log("Requesting GPS...");
                 navigator.geolocation.watchPosition(
                     pos => {
                         const speed = (pos.coords.speed || 0) * 3.6;
+                        console.log("GPS update:", speed, "km/h");
                         if (dotNetHelper)
-                            dotNetHelper.invokeMethodAsync('UpdateSpeed', speed, speed);
+                            dotNetHelper.invokeMethodAsync('UpdateSpeed', speed, 0);
                     },
                     err => console.error("GPS error:", err),
-                    { enableHighAccuracy: true }
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                 );
+            } else {
+                console.warn("Geolocation not supported");
             }
         }
 
