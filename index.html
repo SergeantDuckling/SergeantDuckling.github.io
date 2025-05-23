@@ -33,6 +33,7 @@
     <script>
         let watchId;
         let dotNetHelper = null;
+        let lastPosition = null;
 
         function registerDotNetHelper(helper) {
             dotNetHelper = helper;
@@ -40,60 +41,64 @@
         }
 
         function startTracking(helper) {
-            try {
-                dotNetHelper = helper;
-                if (!navigator.geolocation) {
-                    console.warn("Geolocation not supported");
-                    return;
-                }
+            dotNetHelper = helper;
 
-                watchId = navigator.geolocation.watchPosition(
-                    pos => {
-                        const speed = (pos.coords.speed || 0) * 3.6;
-                        try {
-                            if (dotNetHelper)
-                                dotNetHelper.invokeMethodAsync('UpdateSpeed', speed, speed);
-                        } catch (err) {
-                            console.error("❌ JS → .NET UpdateSpeed failed:", err);
-                        }
-                    },
-                    err => console.error("❌ GPS error:", err),
-                    { enableHighAccuracy: true }
-                );
-            } catch (e) {
-                console.error("❌ startTracking error:", e);
+            if (!navigator.geolocation) {
+                console.warn("Geolocation not supported");
+                return;
             }
+
+            watchId = navigator.geolocation.watchPosition(
+                pos => {
+                    const currentTime = pos.timestamp;
+                    const currentCoords = pos.coords;
+
+                    if (lastPosition) {
+                        const timeDiff = (currentTime - lastPosition.timestamp) / 1000; // seconds
+                        const distance = calculateDistance(
+                            lastPosition.coords.latitude,
+                            lastPosition.coords.longitude,
+                            currentCoords.latitude,
+                            currentCoords.longitude
+                        ); // meters
+
+                        const speed = timeDiff > 0 ? (distance / timeDiff) * 3.6 : 0; // km/h
+
+                        if (dotNetHelper) {
+                            dotNetHelper.invokeMethodAsync('UpdateSpeed', speed, 0);
+                        }
+                    }
+
+                    lastPosition = {
+                        coords: currentCoords,
+                        timestamp: currentTime
+                    };
+                },
+                err => console.error("❌ GPS error:", err),
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
         }
 
         function stopTracking() {
-            if (watchId) navigator.geolocation.clearWatch(watchId);
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            lastPosition = null;
         }
 
-        function startGPS() {
-            try {
-                if (!navigator.geolocation) {
-                    console.warn("Geolocation not supported");
-                    return;
-                }
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000; // Radius of Earth in meters
+            const toRad = deg => deg * Math.PI / 180;
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
 
-                console.log("Requesting GPS...");
-                navigator.geolocation.watchPosition(
-                    pos => {
-                        const speed = (pos.coords.speed || 0) * 3.6;
-                        console.log("📡 GPS update:", speed, "km/h");
-                        try {
-                            if (dotNetHelper)
-                                dotNetHelper.invokeMethodAsync('UpdateSpeed', speed, 0);
-                        } catch (e) {
-                            console.error("❌ GPS invoke failed:", e);
-                        }
-                    },
-                    err => console.error("❌ GPS error:", err),
-                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-                );
-            } catch (e) {
-                console.error("❌ startGPS failed:", e);
-            }
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return R * c;
         }
 
         function enableMotion() {
