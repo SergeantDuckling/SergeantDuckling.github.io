@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>IRBSpeedApp</title>
+    <base href="/" />
+    <link href="css/bootstrap/bootstrap.min.css" rel="stylesheet" />
+    <link href="css/app.css" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link href="IRBSpeedApp.styles.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="app">
+        <svg class="loading-progress">
+            <circle r="40%" cx="50%" cy="50%" />
+            <circle r="40%" cx="50%" cy="50%" />
+        </svg>
+        <div class="loading-progress-text"></div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+    <script src="_framework/blazor.webassembly.js"></script>
+
+    <!-- 🌐 JS Interop Helpers -->
+    <script>
+        let watchId;
+        let dotNetHelper = null;
+        let lastPosition = null;
+
+        function registerDotNetHelper(helper) {
+            dotNetHelper = helper;
+            console.log("✅ .NET helper registered");
+        }
+
+        function startTracking(helper) {
+            dotNetHelper = helper;
+
+            if (!navigator.geolocation) {
+                console.warn("Geolocation not supported");
+                return;
+            }
+
+            watchId = navigator.geolocation.watchPosition(
+                pos => {
+                    const currentTime = pos.timestamp;
+                    const currentCoords = pos.coords;
+
+                    if (lastPosition) {
+                        const timeDiff = (currentTime - lastPosition.timestamp) / 1000;
+                        const distance = calculateDistance(
+                            lastPosition.coords.latitude,
+                            lastPosition.coords.longitude,
+                            currentCoords.latitude,
+                            currentCoords.longitude
+                        );
+
+                        const speed = timeDiff > 0 ? (distance / timeDiff) * 3.6 : 0;
+
+                        if (dotNetHelper) {
+                            dotNetHelper.invokeMethodAsync('UpdateSpeed', speed, 0);
+                        }
+                    }
+
+                    lastPosition = {
+                        coords: currentCoords,
+                        timestamp: currentTime
+                    };
+                },
+                err => console.error("❌ GPS error:", err),
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        }
+
+        function stopTracking() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            lastPosition = null;
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000;
+            const toRad = deg => deg * Math.PI / 180;
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
+
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return R * c;
+        }
+
+        function enableMotion() {
+            try {
+                if (typeof DeviceMotionEvent !== "undefined" &&
+                    typeof DeviceMotionEvent.requestPermission === "function") {
+
+                    DeviceMotionEvent.requestPermission()
+                        .then(response => {
+                            if (response === "granted") {
+                                window.addEventListener("devicemotion", event => {
+                                    try {
+                                        if (dotNetHelper)
+                                            dotNetHelper.invokeMethodAsync(
+                                                'UpdateSpeed',
+                                                0,
+                                                event.acceleration?.x || 0
+                                            );
+                                    } catch (e) {
+                                        console.error("❌ Motion invoke failed:", e);
+                                    }
+                                });
+                            } else {
+                                alert("Motion permission denied");
+                            }
+                        })
+                        .catch(e => console.error("❌ Motion permission request failed:", e));
+                } else {
+                    window.addEventListener("devicemotion", event => {
+                        try {
+                            if (dotNetHelper)
+                                dotNetHelper.invokeMethodAsync(
+                                    'UpdateSpeed',
+                                    0,
+                                    event.acceleration?.x || 0
+                                );
+                        } catch (e) {
+                            console.error("❌ Fallback motion invoke failed:", e);
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error("❌ enableMotion error:", e);
+            }
+        }
+    </script>
+
+    <!-- 📁 File Export -->
+    <script>
+        window.BlazorDownloadFile = (filename, base64) => {
+            try {
+                const link = document.createElement('a');
+                link.download = filename;
+                link.href = 'data:text/csv;base64,' + base64;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (e) {
+                console.error("❌ File download error:", e);
+            }
+        };
+    </script>
+
+    <!-- 🧱 Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+            crossorigin="anonymous">
+    </script>
+</body>
+
+</html>
