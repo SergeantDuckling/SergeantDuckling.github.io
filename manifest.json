@@ -1,6 +1,6 @@
 {
   "name": "IRB Speed Testing App",
-  "short_name": "IRB Speet Test",
+  "short_name": "IRB Speed",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0A3D62",

@@ -1,25 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="utf-8" />
     <meta name="viewport"
           content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>IRBSpeedApp</title>
     <base href="/" />
+
+    <!-- App Icons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon.png" />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#0A3D62" />
+
+    <!-- Styles -->
     <link href="css/bootstrap/bootstrap.min.css" rel="stylesheet" />
     <link href="css/app.css" rel="stylesheet" />
-    <link rel="icon" type="image/png" href="favicon.png" />
     <link href="IRBSpeedApp.styles.css" rel="stylesheet" />
 </head>
+
 <body>
-    <div id="app">…loading UI…</div>
-    <div id="blazor-error-ui">…error UI…</div>
+    <div id="app">
+        <svg class="loading-progress">
+            <circle r="40%" cx="50%" cy="50%" />
+            <circle r="40%" cx="50%" cy="50%" />
+        </svg>
+        <div class="loading-progress-text"></div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
     <script src="_framework/blazor.webassembly.js"></script>
 
+    <!-- Register Service Worker for PWA -->
     <script>
-        let watchId, dotNetHelper = null, lastPosition = null;
-        let maxAccuracy = 20;       // meters
-        let speedAlpha = 0.3, lastSpeed = 0;
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(() => console.log('✅ Service Worker registered'))
+                    .catch(e => console.error('❌ SW registration failed', e));
+            });
+        }
+    </script>
+
+    <!-- JS Interop Helpers: GPS @ ~1Hz with accuracy filtering & accel smoothing -->
+    <script>
+        let watchId,
+            dotNetHelper = null,
+            lastPosition = null,
+            maxAccuracy = 20,      // meters
+            speedAlpha = 0.3,      // smoothing factor
+            lastSpeed = 0,
+            alpha = 0.2,
+            lastAccelX = 0;
 
         function registerDotNetHelper(helper) {
             dotNetHelper = helper;
@@ -40,7 +80,7 @@
                     const { latitude, longitude, speed: rawMps, accuracy } = pos.coords;
                     console.log(`📍 fix at ${latitude},${longitude} acc=${accuracy}m`);
 
-                    // skip if accuracy is too poor
+                    // ignore poor-accuracy fixes
                     if (accuracy > maxAccuracy) {
                         console.warn(`⚠️ Discarding fix: accuracy ${accuracy}m > ${maxAccuracy}m`);
                         return;
@@ -62,10 +102,16 @@
 
                     lastPosition = { coords: pos.coords, timestamp: pos.timestamp };
 
-                    // smooth
+                    // exponential smoothing
                     let smoothKmh = speedAlpha * rawKmh + (1 - speedAlpha) * lastSpeed;
                     lastSpeed = smoothKmh;
-                    console.log(`ℹ️ raw=${rawKmh.toFixed(1)}km/h → smooth=${smoothKmh.toFixed(1)}km/h`);
+
+                    // clamp small walking speeds to zero
+                    if (smoothKmh < 5) {
+                        smoothKmh = 0;
+                    }
+
+                    console.log(`ℹ️ raw=${rawKmh.toFixed(1)} → smooth=${smoothKmh.toFixed(1)} km/h`);
 
                     if (dotNetHelper) {
                         dotNetHelper.invokeMethodAsync('ReportGps', smoothKmh)
@@ -79,24 +125,60 @@
 
         function stopTracking() {
             console.log("⏹ stopTracking called");
-            if (watchId) navigator.geolocation.clearWatch(watchId);
-            watchId = null; lastPosition = null;
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            lastPosition = null;
         }
 
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371000, toRad = d => d * Math.PI / 180;
-            const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
-            const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+            const R = 6371000,
+                toRad = d => d * Math.PI / 180,
+                dLat = toRad(lat2 - lat1),
+                dLon = toRad(lon2 - lon1),
+                a = Math.sin(dLat / 2) ** 2 +
+                    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
             return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         }
 
-        // Accel smoothing unchanged
-        function enableMotion() { /* …your existing accel code…*/ }
+        function enableMotion() {
+            console.log("▶️ enableMotion called");
+            try {
+                if (typeof DeviceMotionEvent !== "undefined" &&
+                    typeof DeviceMotionEvent.requestPermission === "function") {
+                    DeviceMotionEvent.requestPermission()
+                        .then(resp => {
+                            if (resp === "granted") attachMotion();
+                            else alert("Motion permission denied");
+                        })
+                        .catch(e => console.error("❌ Motion perm fail:", e));
+                } else {
+                    attachMotion();
+                }
+            } catch (e) {
+                console.error("❌ enableMotion error:", e);
+            }
+        }
+
+        function attachMotion() {
+            window.addEventListener("devicemotion", ev => {
+                const rawX = ev.acceleration?.x || 0;
+                const smoothX = alpha * rawX + (1 - alpha) * lastAccelX;
+                lastAccelX = smoothX;
+                console.log("🌀 accel smoothed:", smoothX);
+                if (dotNetHelper) {
+                    dotNetHelper.invokeMethodAsync('ReportAccel', smoothX)
+                        .catch(e => console.error(e));
+                }
+            });
+        }
     </script>
 
-    <!-- bootstrap bundle… -->
+    <!-- Bootstrap JS for mobile nav -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
             integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
             crossorigin="anonymous"></script>
 </body>
+
 </html>
