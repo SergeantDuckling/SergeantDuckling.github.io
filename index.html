@@ -7,7 +7,7 @@
     <title>IRBSpeedApp</title>
     <base href="/" />
 
-    <!-- App icons & PWA -->
+    <!-- PWA Icons -->
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="favicon.png" />
     <link rel="manifest" href="manifest.json" />
@@ -19,102 +19,100 @@
     <link href="IRBSpeedApp.styles.css" rel="stylesheet" />
 </head>
 <body>
-    <div id="app">…loading UI…</div>
-    <div id="blazor-error-ui">…error UI…</div>
+    <div id="app">
+        <svg class="loading-progress">
+            <circle r="40%" cx="50%" cy="50%" />
+            <circle r="40%" cx="50%" cy="50%" />
+        </svg>
+        <div class="loading-progress-text"></div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
 
     <script src="_framework/blazor.webassembly.js"></script>
 
-    <!-- Service Worker Registration -->
+    <!-- Register Service Worker -->
     <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('service-worker.js')
-          .catch(() => {/* silent */});
-      });
-    }
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js')
+                .catch(() => { });
+        }
     </script>
 
-    <!-- GPS & Accelerometer Interop -->
+    <!-- JS Interop (GPS & accel smoothing) -->
     <script>
-    let watchId, dotNetHelper = null, lastPosition = null;
-    const maxAccuracy = 20, speedAlpha = 0.3, accelAlpha = 0.2, accelThreshold = 2;
-    let lastSpeed = 0, lastAccelX = 0;
+        let watchId, dotNetHelper = null, lastPosition = null;
+        const maxAccuracy = 20, speedAlpha = 0.3, accelAlpha = 0.2, accelThreshold = 2;
+        let lastSpeed = 0, lastAccelX = 0;
 
-    function registerDotNetHelper(helper) {
-      dotNetHelper = helper;
-    }
+        function registerDotNetHelper(helper) {
+            dotNetHelper = helper;
+        }
 
-    function startTracking(helper) {
-      dotNetHelper = helper;
-      if (!navigator.geolocation) return;
+        function startTracking(helper) {
+            dotNetHelper = helper;
+            if (!navigator.geolocation) return;
+            watchId = navigator.geolocation.watchPosition(
+                pos => {
+                    const { speed: rawMps, accuracy } = pos.coords;
+                    if (accuracy > maxAccuracy) return;
+                    let rawKmh = rawMps != null ? rawMps * 3.6
+                        : (() => {
+                            if (!lastPosition) return 0;
+                            const dt = (pos.timestamp - lastPosition.timestamp) / 1000;
+                            const d = calculateDistance(
+                                lastPosition.coords.latitude, lastPosition.coords.longitude,
+                                pos.coords.latitude, pos.coords.longitude
+                            );
+                            return dt > 0 ? (d / dt) * 3.6 : 0;
+                        })();
+                    lastPosition = { coords: pos.coords, timestamp: pos.timestamp };
+                    let smoothKmh = speedAlpha * rawKmh + (1 - speedAlpha) * lastSpeed;
+                    lastSpeed = smoothKmh < 5 ? 0 : smoothKmh;
+                    dotNetHelper?.invokeMethodAsync('ReportGps', lastSpeed)
+                        .catch(() => { });
+                },
+                () => { },
+                { enableHighAccuracy: true, timeout: Infinity, maximumAge: 0 }
+            );
+        }
 
-      watchId = navigator.geolocation.watchPosition(
-        pos => {
-          const { latitude, longitude, speed: rawMps, accuracy } = pos.coords;
-          if (accuracy > maxAccuracy) return;
+        function stopTracking() {
+            if (watchId) navigator.geolocation.clearWatch(watchId);
+            watchId = null; lastPosition = null;
+        }
 
-          // raw km/h
-          let rawKmh = rawMps != null
-            ? rawMps * 3.6
-            : (lastPosition
-               ? (calculateDistance(
-                    lastPosition.coords.latitude,
-                    lastPosition.coords.longitude,
-                    latitude, longitude
-                  ) / ((pos.timestamp - lastPosition.timestamp)/1000)) * 3.6
-               : 0);
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000, toRad = d => d * Math.PI / 180;
+            const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+            const a = Math.sin(dLat / 2) ** 2 +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+            return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
 
-          lastPosition = { coords: pos.coords, timestamp: pos.timestamp };
+        function enableMotion() {
+            if (DeviceMotionEvent?.requestPermission) {
+                DeviceMotionEvent.requestPermission()
+                    .then(resp => { if (resp === 'granted') attachMotion() })
+                    .catch(() => { });
+            } else attachMotion();
+        }
 
-          // smooth GPS
-          let smoothKmh = speedAlpha * rawKmh + (1 - speedAlpha) * lastSpeed;
-          lastSpeed = smoothKmh < 5 ? 0 : smoothKmh;  // clamp below 5 km/h
-
-          dotNetHelper?.invokeMethodAsync('ReportGps', lastSpeed)
-            .catch(() => {});
-        },
-        () => {/* error ignored */},
-        { enableHighAccuracy: true, timeout: Infinity, maximumAge: 0 }
-      );
-    }
-
-    function stopTracking() {
-      if (watchId) navigator.geolocation.clearWatch(watchId);
-      watchId = null; lastPosition = null;
-    }
-
-    function calculateDistance(lat1, lon1, lat2, lon2) {
-      const R = 6371000, toRad = d => d * Math.PI/180;
-      const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
-      const a = Math.sin(dLat/2)**2 +
-                Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-      return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    }
-
-    function enableMotion() {
-      if (typeof DeviceMotionEvent !== 'undefined' &&
-          typeof DeviceMotionEvent.requestPermission === 'function') {
-        DeviceMotionEvent.requestPermission()
-          .then(resp => { if (resp==='granted') attachMotion(); })
-          .catch(() => {});
-      } else {
-        attachMotion();
-      }
-    }
-
-    function attachMotion() {
-      window.addEventListener('devicemotion', ev => {
-        const rawX = ev.acceleration?.x || 0;
-        // filter sudden jolts
-        const delta = Math.abs(rawX - lastAccelX);
-        const filtered = delta > accelThreshold ? lastAccelX : rawX;
-        const smoothX = accelAlpha * filtered + (1 - accelAlpha) * lastAccelX;
-        lastAccelX = smoothX;
-
-        dotNetHelper?.invokeMethodAsync('ReportAccel', smoothX)
-          .catch(() => {});
-      });
-    }
+        function attachMotion() {
+            window.addEventListener('devicemotion', ev => {
+                const rawX = ev.acceleration?.x || 0;
+                const delta = Math.abs(rawX - lastAccelX);
+                const filt = delta > accelThreshold ? lastAccelX : rawX;
+                const smoothX = accelAlpha * filt + (1 - accelAlpha) * lastAccelX;
+                lastAccelX = smoothX;
+                dotNetHelper?.invokeMethodAsync('ReportAccel', smoothX)
+                    .catch(() => { });
+            });
+        }
     </script>
 
     <!-- Bootstrap JS -->
