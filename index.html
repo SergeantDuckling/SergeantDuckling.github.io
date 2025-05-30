@@ -1,25 +1,51 @@
+<!--
+    Hi Mr Hines, If you are reading this, good. You may become aware of the extensive commenting
+    throughout most if not all of the classes. This is because i dont have a single cluw what all of this is
+    Because i coded it, moved onto something else, then i have needed to come back and change something and
+    because i dont really know javascript and c# using these sensors and stuff, having this commentary makes
+    finding and changing everything very very easy and alot simpler for me.
+
+    Have fun with this abomination of code
+
+    Cheers,
+    Your Favourite Student
+-->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Character encoding -->
     <meta charset="utf-8" />
+    <!-- Responsive viewport settings to ensure proper scaling on mobile -->
     <meta name="viewport"
           content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <!-- Browser tab title -->
     <title>IRBSpeedApp</title>
+    <!-- Base URL for all relative links -->
     <base href="/" />
 
-    <!-- PWA Icons -->
+    <!-- PWA / App icons for various platforms -->
+    <!-- iOS home‐screen icon -->
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+    <!-- Standard favicon for browsers -->
     <link rel="icon" type="image/png" sizes="32x32" href="favicon.png" />
+    <!-- Web App Manifest describing PWA behavior -->
     <link rel="manifest" href="manifest.json" />
+    <!-- Theme color for mobile address bar / task switcher UI -->
     <meta name="theme-color" content="#0A3D62" />
 
-    <!-- Styles -->
+    <!-- CSS stylesheets -->
+    <!-- Bootstrap core styles -->
     <link href="css/bootstrap/bootstrap.min.css" rel="stylesheet" />
+    <!-- Application‐specific styles -->
     <link href="css/app.css" rel="stylesheet" />
+    <!-- Blazor‐generated component styles -->
     <link href="IRBSpeedApp.styles.css" rel="stylesheet" />
 </head>
 <body>
+    <!-- Root element for Blazor to render into -->
     <div id="app">
+        <!-- Loading indicator shown until Blazor app boots (found this online haha) -->
         <svg class="loading-progress">
             <circle r="40%" cx="50%" cy="50%" />
             <circle r="40%" cx="50%" cy="50%" />
@@ -27,95 +53,151 @@
         <div class="loading-progress-text"></div>
     </div>
 
+    <!-- Fallback UI displayed if a Blazor error occurs (this seems to be my favourite piece of code) -->
     <div id="blazor-error-ui">
         An unhandled error has occurred.
         <a href="" class="reload">Reload</a>
         <a class="dismiss">🗙</a>
     </div>
 
+    <!-- Blazor WebAssembly runtime bootstrap script -->
     <script src="_framework/blazor.webassembly.js"></script>
 
-    <!-- Register Service Worker -->
+    <!-- Register Service Worker for PWA (i dont like this bit very much) -->
     <script>
         if ('serviceWorker' in navigator) {
+            // Attempt... (seemed that way too) to register the service worker without blocking on failure
             navigator.serviceWorker.register('service-worker.js')
                 .catch(() => { });
         }
     </script>
 
-    <!-- JS Interop (GPS & accel smoothing) -->
+    <!-- JavaScript Interop Helpers: GPS tracking, accelerometer, and smoothing -->
     <script>
+        // Variables for geolocation and motion interop
         let watchId, dotNetHelper = null, lastPosition = null;
-        const maxAccuracy = 20, speedAlpha = 0.3, accelAlpha = 0.2, accelThreshold = 2;
+        // Configuration constants
+        const maxAccuracy = 20;       // maximum acceptable GPS accuracy in meters (will come into play once i add in a gps strength meter)
+        const speedAlpha = 0.3;       // exponential smoothing factor for speed
+        const accelAlpha = 0.2;       // smoothing factor for acceleration
+        const accelThreshold = 1.5;   // acceleration delta threshold to reject sudden jolts
+        // State for smoothing
         let lastSpeed = 0, lastAccelX = 0;
 
+        /**
+         * Called from Blazor to register the .NET interop helper.
+         * @param helper DotNetObjectReference for invoking C# methods.
+         */
         function registerDotNetHelper(helper) {
             dotNetHelper = helper;
         }
 
+        /**
+         * Start GPS tracking at ⁓1 Hz with high accuracy (as possible but reliant on gps strength).
+         * Filters out poor‐accuracy fixes and smooths the resulting speed.
+         */
         function startTracking(helper) {
             dotNetHelper = helper;
-            if (!navigator.geolocation) return;
+            if (!navigator.geolocation) return;  // bail out if unsupported
+
             watchId = navigator.geolocation.watchPosition(
                 pos => {
                     const { speed: rawMps, accuracy } = pos.coords;
+                    // Discard if accuracy worse than threshold
                     if (accuracy > maxAccuracy) return;
-                    let rawKmh = rawMps != null ? rawMps * 3.6
+
+                    // Compute raw speed in km/h, fallback via distance delta if no native speed
+                    let rawKmh = rawMps != null
+                        ? rawMps * 3.6
                         : (() => {
                             if (!lastPosition) return 0;
-                            const dt = (pos.timestamp - lastPosition.timestamp) / 1000;
+                            const dt = (pos.timestamp - lastPosition.timestamp) / 1000;  // seconds
                             const d = calculateDistance(
-                                lastPosition.coords.latitude, lastPosition.coords.longitude,
-                                pos.coords.latitude, pos.coords.longitude
+                                lastPosition.coords.latitude,
+                                lastPosition.coords.longitude,
+                                pos.coords.latitude,
+                                pos.coords.longitude
                             );
                             return dt > 0 ? (d / dt) * 3.6 : 0;
                         })();
+
+                    // Update last position for next delta calculation
                     lastPosition = { coords: pos.coords, timestamp: pos.timestamp };
+
+                    // Exponential smoothing of speed
                     let smoothKmh = speedAlpha * rawKmh + (1 - speedAlpha) * lastSpeed;
+                    // Clamp walking speeds (<5 km/h) to zero
                     lastSpeed = smoothKmh < 5 ? 0 : smoothKmh;
+
+                    // Invoke C# ReportGps(double) method
                     dotNetHelper?.invokeMethodAsync('ReportGps', lastSpeed)
-                        .catch(() => { });
+                        .catch(() => { /* swallow errors so i dont have to deal with it */ });
                 },
-                () => { },
-                { enableHighAccuracy: true, timeout: Infinity, maximumAge: 0 }
+                () => { /* ignore geolocation errors (basically just telling it to shut up) */ },
+                {
+                    enableHighAccuracy: true,
+                    timeout: Infinity,
+                    maximumAge: 0
+                }
             );
         }
 
+        /**
+         * Stop GPS tracking and reset state.
+         */
         function stopTracking() {
             if (watchId) navigator.geolocation.clearWatch(watchId);
-            watchId = null; lastPosition = null;
+            watchId = null;
+            lastPosition = null;
         }
 
+        /**
+         * Haversine formula (looked up on the internet (still dunno)) to compute distance between two lat/lon points.
+         * @returns distance in meters
+         */
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371000, toRad = d => d * Math.PI / 180;
-            const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+            const R = 6371000;                // Earth radius in meters
+            const toRad = d => d * Math.PI / 180; // used Math.PI for exact pi numerals
+            const dLat = toRad(lat2 - lat1),
+                dLon = toRad(lon2 - lon1);
             const a = Math.sin(dLat / 2) ** 2 +
                 Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
             return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         }
 
+        /**
+         * Request motion permissions on iOS, or attach listener immediately.
+         */
         function enableMotion() {
             if (DeviceMotionEvent?.requestPermission) {
                 DeviceMotionEvent.requestPermission()
-                    .then(resp => { if (resp === 'granted') attachMotion() })
+                    .then(resp => { if (resp === 'granted') attachMotion(); })
                     .catch(() => { });
-            } else attachMotion();
+            } else {
+                attachMotion();
+            }
         }
 
+        /**
+         * Attach device motion listener and smooth out raw X-axis acceleration.
+         */
         function attachMotion() {
             window.addEventListener('devicemotion', ev => {
                 const rawX = ev.acceleration?.x || 0;
+                // Reject sudden jolts above threshold
                 const delta = Math.abs(rawX - lastAccelX);
                 const filt = delta > accelThreshold ? lastAccelX : rawX;
+                // Exponential smoothing for acceleration
                 const smoothX = accelAlpha * filt + (1 - accelAlpha) * lastAccelX;
                 lastAccelX = smoothX;
+                // Invoke C# ReportAccel(double) method
                 dotNetHelper?.invokeMethodAsync('ReportAccel', smoothX)
-                    .catch(() => { });
+                    .catch(() => { /* ignore */ });
             });
         }
     </script>
 
-    <!-- Bootstrap JS -->
+    <!-- Bootstrap JavaScript bundle for responsive UI components -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
             integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
             crossorigin="anonymous"></script>
