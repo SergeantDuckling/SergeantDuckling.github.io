@@ -255,6 +255,52 @@
         };
     </script>
 
+    <!-- Stormglass API fetch by beach name -->
+    <script>
+        /**
+         * Given a place string, geocode via Nominatim then fetch Stormglass data.
+         */
+        async function fetchWeatherByBeach(beachName) {
+            try {
+                // 1. Geocode beachName
+                const geoRes = await fetch(
+                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(beachName)}&limit=1`
+                );
+                const geoJson = await geoRes.json();
+                if (!geoJson.length) {
+                    console.error("No geocode result for", beachName);
+                    return;
+                }
+                const { lat, lon } = geoJson[0];
+
+                // 2. Fetch Stormglass
+                const key = "b912148e-66b1-11f0-bc20-0242ac130006-b912154c-66b1-11f0-bc20-0242ac130006";
+                const url = `https://api.stormglass.io/v2/weather/point?lat=${lat}&lng=${lon}` +
+                    `&params=airTemperature,waterTemperature,windSpeed,windDirection,waveHeight&source=noaa`;
+
+                const res = await fetch(url, { headers: { Authorization: key } });
+                const json = await res.json();
+                const pt = json.hours?.[0];
+                if (!pt) return;
+
+                const weather = {
+                    time: new Date().toISOString(),
+                    beach: beachName,
+                    lat: parseFloat(lat),
+                    lng: parseFloat(lon),
+                    airTemp: pt.airTemperature?.noaa ?? 0,
+                    waterTemp: pt.waterTemperature?.noaa ?? 0,
+                    windSpeed: pt.windSpeed?.noaa ?? 0,
+                    windDir: pt.windDirection?.noaa ?? 0,
+                    waveHeight: pt.waveHeight?.noaa ? pt.waveHeight.noaa * 3.28084 : 0
+                };
+                localStorage.setItem("weather", JSON.stringify(weather));
+            } catch (e) {
+                console.error("fetchWeatherByBeach failed", e);
+            }
+        }
+    </script>
+
     <!-- Bootstrap JavaScript bundle for responsive UI components -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
             integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
