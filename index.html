@@ -78,8 +78,8 @@
         // Configuration constants
         const maxAccuracy = 20;       // maximum acceptable GPS accuracy in meters
         const speedAlpha = 0.3;       // exponential smoothing factor for speed
-        const accelAlpha = 0.2;       // smoothing factor for acceleration
-        const accelThreshold = 1.5;   // acceleration delta threshold to reject sudden jolts
+        const accelAlpha = 1.2;       // smoothing factor for acceleration
+        const accelThreshold = 0.5;   // acceleration delta threshold to reject sudden jolts
         // State for smoothing
         let lastSpeed = 0, lastAccelX = 0;
 
@@ -131,8 +131,8 @@
 
                     // Exponential smoothing of speed
                     let smoothKmh = speedAlpha * rawKmh + (1 - speedAlpha) * lastSpeed;
-                    // Clamp walking speeds (<5 km/h) to zero
-                    lastSpeed = smoothKmh < 5 ? 0 : smoothKmh;
+                    // Clamp walking speeds (<1 km/h) to zero
+                    lastSpeed = smoothKmh < 1 ? 0 : smoothKmh;
 
                     // Invoke C# ReportGps(double) method
                     dotNetHelper?.invokeMethodAsync('ReportGps', lastSpeed)
@@ -204,7 +204,7 @@
     <script>
         /**
          * Called from Blazor to export a CSV:
-         *  - On mobile: uses Web Share API to let user pick an app or Files location
+         *  - On mobile: uses Web Share API to let user pick an app or Files locati         * on
          *  - Fallback: creates a hidden "download" link
          */
         window.BlazorDownloadFile = async (filename, base64) => {
@@ -260,9 +260,10 @@
 
     <!-- Geocode + Stormglass fetch by beach name (full code) -->
     <script>
-        /**
+        /*
          * Given a beach name, geocode via Nominatim (AU only),
          * then fetch Stormglass data and store in localStorage["weather"].
+         *Im not gonna lie, the base of this part (the api) was chat GPT and i just adjusted this to suit, i did the bit in speedtest.razor tho
          */
         async function fetchWeatherByBeach(beachName) {
             if (!beachName) return;
