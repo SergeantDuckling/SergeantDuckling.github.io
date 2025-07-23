@@ -255,16 +255,19 @@
         };
     </script>
 
-    <!-- Stormglass API fetch by beach name -->
+    <!-- Geocode + Stormglass fetch by beach name -->
     <script>
         /**
-         * Given a place string, geocode via Nominatim then fetch Stormglass data.
+         * Given a beach name, geocode via Nominatim (Australia only),
+         * then fetch Stormglass data and store in localStorage["weather"].
          */
         async function fetchWeatherByBeach(beachName) {
+            if (!beachName) return;
+
             try {
-                // 1. Geocode beachName
+                // 1. Geocode, restricting to Australia
                 const geoRes = await fetch(
-                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(beachName)}&limit=1`
+                    `https://nominatim.openstreetmap.org/search?format=json&countrycodes=au&limit=1&q=${encodeURIComponent(beachName)}`
                 );
                 const geoJson = await geoRes.json();
                 if (!geoJson.length) {
@@ -277,12 +280,12 @@
                 const key = "b912148e-66b1-11f0-bc20-0242ac130006-b912154c-66b1-11f0-bc20-0242ac130006";
                 const url = `https://api.stormglass.io/v2/weather/point?lat=${lat}&lng=${lon}` +
                     `&params=airTemperature,waterTemperature,windSpeed,windDirection,waveHeight&source=noaa`;
-
                 const res = await fetch(url, { headers: { Authorization: key } });
                 const json = await res.json();
                 const pt = json.hours?.[0];
                 if (!pt) return;
 
+                // 3. Store full weather object
                 const weather = {
                     time: new Date().toISOString(),
                     beach: beachName,
