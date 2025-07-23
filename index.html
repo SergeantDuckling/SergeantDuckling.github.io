@@ -174,6 +174,7 @@
          * Request motion permissions on iOS, or attach listener immediately.
          */
         function enableMotion() {
+            // Always call requestPermission on iOS to force prompt
             if (typeof DeviceMotionEvent !== 'undefined' &&
                 typeof DeviceMotionEvent.requestPermission === 'function') {
 
@@ -185,7 +186,7 @@
                     })
                     .catch(e => console.error("❌ Motion permission request failed:", e));
             } else {
-                // Non‑iOS fallback
+                // Non‐iOS fallback
                 attachMotion();
             }
         }
@@ -220,8 +221,8 @@
                 // Decode base64 into a Uint8Array
                 const byteChars = atob(base64);
                 const len = byteChars.length;
-                const bytes = new Uint8Array(len);
-                for (let i = 0; i < len; i++) {
+                const bytes = new Uint8Array(len).
+                    for(let i = 0; i < len; i++) {
                     bytes[i] = byteChars.charCodeAt(i);
                 }
                 const blob = new Blob([bytes], { type: 'text/csv' });
