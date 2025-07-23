@@ -45,7 +45,7 @@
 <body>
     <!-- Root element for Blazor to render into -->
     <div id="app">
-        <!-- Loading indicator shown until Blazor app boots -->
+        <!-- Loading indicator shown until Blazor app boots (found this online haha) -->
         <svg class="loading-progress">
             <circle r="40%" cx="50%" cy="50%" />
             <circle r="40%" cx="50%" cy="50%" />
@@ -53,7 +53,7 @@
         <div class="loading-progress-text"></div>
     </div>
 
-    <!-- Fallback UI displayed if a Blazor error occurs -->
+    <!-- Fallback UI displayed if a Blazor error occurs (this seems to be my favourite piece of code) -->
     <div id="blazor-error-ui">
         An unhandled error has occurred.
         <a href="" class="reload">Reload</a>
@@ -63,9 +63,10 @@
     <!-- Blazor WebAssembly runtime bootstrap script -->
     <script src="_framework/blazor.webassembly.js"></script>
 
-    <!-- Register Service Worker for PWA -->
+    <!-- Register Service Worker for PWA (i dont like this bit very much) -->
     <script>
         if ('serviceWorker' in navigator) {
+            // Attempt... (seemed that way too) to register the service worker without blocking on failure
             navigator.serviceWorker.register('service-worker.js')
                 .catch(() => { });
         }
@@ -92,13 +93,13 @@
         }
 
         /**
-         * Start GPS tracking at ⁓1 Hz with high accuracy.
+         * Start GPS tracking at ⁓1 Hz with high accuracy (as possible but reliant on gps strength).
          * Filters out poor‐accuracy readings and smooths the resulting speed.
          * Also reports GPS accuracy for signal‐strength bars.
          */
         function startTracking(helper) {
             dotNetHelper = helper;
-            if (!navigator.geolocation) return;
+            if (!navigator.geolocation) return;  // bail out if unsupported
 
             watchId = navigator.geolocation.watchPosition(
                 pos => {
@@ -116,7 +117,7 @@
                         ? rawMps * 3.6
                         : (() => {
                             if (!lastPosition) return 0;
-                            const dt = (pos.timestamp - lastPosition.timestamp) / 1000;
+                            const dt = (pos.timestamp - lastPosition.timestamp) / 1000;  // seconds
                             const d = calculateDistance(
                                 lastPosition.coords.latitude,
                                 lastPosition.coords.longitude,
@@ -136,7 +137,7 @@
 
                     // Invoke C# ReportGps(double) method
                     dotNetHelper?.invokeMethodAsync('ReportGps', lastSpeed)
-                        .catch(() => { });
+                        .catch(() => { /* swallow errors so i dont have to deal with it */ });
                 },
                 () => { /* ignore geolocation errors */ },
                 {
@@ -162,12 +163,11 @@
          */
         function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371000;                // Earth radius in meters
-            const toRad = d => d * Math.PI / 180;
+            const toRad = d => d * Math.PI / 180; // used Math.PI for exact pi numerals
             const dLat = toRad(lat2 - lat1),
                 dLon = toRad(lon2 - lon1);
             const a = Math.sin(dLat / 2) ** 2 +
-                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-                Math.sin(dLon / 2) ** 2;
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
             return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         }
 
@@ -189,13 +189,17 @@
          */
         function attachMotion() {
             window.addEventListener('devicemotion', ev => {
-                const rawX = ev.acceleration?.x || 0;
+                // Try acceleration, otherwise accelerationIncludingGravity
+                const rawX = ev.acceleration?.x ?? ev.accelerationIncludingGravity?.x ?? 0;
+                // Reject sudden jolts above threshold
                 const delta = Math.abs(rawX - lastAccelX);
                 const filt = delta > accelThreshold ? lastAccelX : rawX;
+                // Exponential smoothing for acceleration
                 const smoothX = accelAlpha * filt + (1 - accelAlpha) * lastAccelX;
                 lastAccelX = smoothX;
+                // Invoke C# ReportAccel(double) method
                 dotNetHelper?.invokeMethodAsync('ReportAccel', smoothX)
-                    .catch(() => { });
+                    .catch(() => { /* ignore */ });
             });
         }
     </script>
@@ -204,7 +208,7 @@
     <script>
         /**
          * Called from Blazor to export a CSV:
-         *  - On mobile: uses Web Share API to let user pick an app or Files locati         * on
+         *  - On mobile: uses Web Share API to let user pick an app or Files location
          *  - Fallback: creates a hidden "download" link
          */
         window.BlazorDownloadFile = async (filename, base64) => {
@@ -263,7 +267,7 @@
         /*
          * Given a beach name, geocode via Nominatim (AU only),
          * then fetch Stormglass data and store in localStorage["weather"].
-         *Im not gonna lie, the base of this part (the api) was chat GPT and i just adjusted this to suit, i did the bit in speedtest.razor tho
+         * Im not gonna lie, the base of this part (the api) was chat GPT and i just adjusted this to suit, i did the bit in speedtest.razor tho
          */
         async function fetchWeatherByBeach(beachName) {
             if (!beachName) return;
