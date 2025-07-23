@@ -1,7 +1,7 @@
 {
   "entryAssembly": "IRBSpeedApp",
   "resources": {
-    "hash": "sha256-cMKm0mgnJx4gEFnYmQjUYGqFXoU2nBWjzo97FruRNO8=",
+    "hash": "sha256-0L6Zg8kUtEBGKLE3O2NMfHk6uEskmKbyKAT8gDSI1kQ=",
     "runtime": {
       "dotnet.js": "sha256-eaJTmow4t8eE7FZMZR5Ja41JMOefGCbIYDTdpclGsac=",
       "dotnet.timezones.blat": "sha256-gbATD5HDsHYtW8vdPYh9iSBY4O5CjvMeCSF5xXWF1xo=",
@@ -12,7 +12,7 @@
     },
     "coreAssembly": {},
     "assembly": {
-      "IRBSpeedApp.dll": "sha256-IRfpl9ATl0fF7V0u2+t/jtUkCrO2qfnXIcBhreAY+G4=",
+      "IRBSpeedApp.dll": "sha256-BbQbALeE+HtMT8I35pRIBPRtwjMt5BtFO4I36/Mgwjc=",
       "Microsoft.AspNetCore.Components.dll": "sha256-QQrA2UkO3trhouRmvGhKcVE+dYHTZULK400y2oQSvEg=",
       "Microsoft.AspNetCore.Components.Forms.dll": "sha256-dU0dEyX44zVxcO0S9qwuaqx+EHPgmadsdSLMuOIqpNY=",
       "Microsoft.AspNetCore.Components.Web.dll": "sha256-EPQWRcaTExk+EtAGVyxC8cl4vhg0VPSl0x3QdPs9LXw=",

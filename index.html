@@ -139,7 +139,7 @@
                     dotNetHelper?.invokeMethodAsync('ReportGps', lastSpeed)
                         .catch(() => { /* swallow errors so i dont have to deal with it */ });
                 },
-                () => { /* ignore geolocation errors */ },
+                () => { /* ignore geolocation errors (basically just telling it to shut up) */ },
                 {
                     enableHighAccuracy: true,
                     timeout: Infinity,
@@ -153,8 +153,7 @@
          */
         function stopTracking() {
             if (watchId) navigator.geolocation.clearWatch(watchId);
-            watchId = null;
-            lastPosition = null;
+            watchId = null; lastPosition = null;
         }
 
         /**
@@ -175,11 +174,18 @@
          * Request motion permissions on iOS, or attach listener immediately.
          */
         function enableMotion() {
-            if (DeviceMotionEvent?.requestPermission === 'function') {
+            if (typeof DeviceMotionEvent !== 'undefined' &&
+                typeof DeviceMotionEvent.requestPermission === 'function') {
+
                 DeviceMotionEvent.requestPermission()
-                    .then(resp => { if (resp === 'granted') attachMotion(); })
-                    .catch(() => { });
+                    .then(response => {
+                        if (response === 'granted') {
+                            attachMotion();
+                        }
+                    })
+                    .catch(e => console.error("❌ Motion permission request failed:", e));
             } else {
+                // Non‑iOS fallback
                 attachMotion();
             }
         }
@@ -191,10 +197,8 @@
             window.addEventListener('devicemotion', ev => {
                 // Try acceleration, otherwise accelerationIncludingGravity
                 const rawX = ev.acceleration?.x ?? ev.accelerationIncludingGravity?.x ?? 0;
-                // Reject sudden jolts above threshold
                 const delta = Math.abs(rawX - lastAccelX);
                 const filt = delta > accelThreshold ? lastAccelX : rawX;
-                // Exponential smoothing for acceleration
                 const smoothX = accelAlpha * filt + (1 - accelAlpha) * lastAccelX;
                 lastAccelX = smoothX;
                 // Invoke C# ReportAccel(double) method
@@ -267,7 +271,6 @@
         /*
          * Given a beach name, geocode via Nominatim (AU only),
          * then fetch Stormglass data and store in localStorage["weather"].
-         * Im not gonna lie, the base of this part (the api) was chat GPT and i just adjusted this to suit, i did the bit in speedtest.razor tho
          */
         async function fetchWeatherByBeach(beachName) {
             if (!beachName) return;
