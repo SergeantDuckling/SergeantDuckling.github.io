@@ -78,7 +78,7 @@
         // Configuration constants
         const maxAccuracy = 20;       // maximum acceptable GPS accuracy in meters
         const speedAlpha = 0.3;       // exponential smoothing factor for speed
-        const accelAlpha = 1.2;       // smoothing factor for acceleration
+        const accelAlpha = 0.1;       // smoothing factor for acceleration
         const accelThreshold = 0.5;   // acceleration delta threshold to reject sudden jolts
         // State for smoothing
         let lastSpeed = 0, lastAccelX = 0;
