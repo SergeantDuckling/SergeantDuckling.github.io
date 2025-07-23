@@ -45,7 +45,7 @@
 <body>
     <!-- Root element for Blazor to render into -->
     <div id="app">
-        <!-- Loading indicator shown until Blazor app boots (found this online haha) -->
+        <!-- Loading indicator shown until Blazor app boots -->
         <svg class="loading-progress">
             <circle r="40%" cx="50%" cy="50%" />
             <circle r="40%" cx="50%" cy="50%" />
@@ -53,7 +53,7 @@
         <div class="loading-progress-text"></div>
     </div>
 
-    <!-- Fallback UI displayed if a Blazor error occurs (this seems to be my favourite piece of code) -->
+    <!-- Fallback UI displayed if a Blazor error occurs -->
     <div id="blazor-error-ui">
         An unhandled error has occurred.
         <a href="" class="reload">Reload</a>
@@ -63,21 +63,20 @@
     <!-- Blazor WebAssembly runtime bootstrap script -->
     <script src="_framework/blazor.webassembly.js"></script>
 
-    <!-- Register Service Worker for PWA (i dont like this bit very much) -->
+    <!-- Register Service Worker for PWA -->
     <script>
         if ('serviceWorker' in navigator) {
-            // Attempt... (seemed that way too) to register the service worker without blocking on failure
             navigator.serviceWorker.register('service-worker.js')
                 .catch(() => { });
         }
     </script>
 
-    <!-- JavaScript Interop Helpers: GPS tracking, accelerometer, and smoothing -->
+    <!-- JavaScript Interop Helpers: GPS tracking, accelerometer, smoothing & strength -->
     <script>
         // Variables for geolocation and motion interop
         let watchId, dotNetHelper = null, lastPosition = null;
         // Configuration constants
-        const maxAccuracy = 20;       // maximum acceptable GPS accuracy in meters (will come into play more once i add in a gps strength meter)
+        const maxAccuracy = 20;       // maximum acceptable GPS accuracy in meters
         const speedAlpha = 0.3;       // exponential smoothing factor for speed
         const accelAlpha = 0.2;       // smoothing factor for acceleration
         const accelThreshold = 1.5;   // acceleration delta threshold to reject sudden jolts
@@ -93,16 +92,22 @@
         }
 
         /**
-         * Start GPS tracking at ⁓1 Hz with high accuracy (as possible but reliant on gps strength).
-         * Filters out poor‐accuracy reading and smooths the resulting speed.
+         * Start GPS tracking at ⁓1 Hz with high accuracy.
+         * Filters out poor‐accuracy readings and smooths the resulting speed.
+         * Also reports GPS accuracy for signal‐strength bars.
          */
         function startTracking(helper) {
             dotNetHelper = helper;
-            if (!navigator.geolocation) return;  // bail out if unsupported
+            if (!navigator.geolocation) return;
 
             watchId = navigator.geolocation.watchPosition(
                 pos => {
                     const { speed: rawMps, accuracy } = pos.coords;
+
+                    // Report GPS accuracy back to Blazor
+                    dotNetHelper?.invokeMethodAsync('ReportGpsAccuracy', accuracy)
+                        .catch(() => { });
+
                     // Discard if accuracy worse than threshold
                     if (accuracy > maxAccuracy) return;
 
@@ -111,7 +116,7 @@
                         ? rawMps * 3.6
                         : (() => {
                             if (!lastPosition) return 0;
-                            const dt = (pos.timestamp - lastPosition.timestamp) / 1000;  // seconds
+                            const dt = (pos.timestamp - lastPosition.timestamp) / 1000;
                             const d = calculateDistance(
                                 lastPosition.coords.latitude,
                                 lastPosition.coords.longitude,
@@ -131,9 +136,9 @@
 
                     // Invoke C# ReportGps(double) method
                     dotNetHelper?.invokeMethodAsync('ReportGps', lastSpeed)
-                        .catch(() => { /* swallow errors so i dont have to deal with it */ });
+                        .catch(() => { });
                 },
-                () => { /* ignore geolocation errors (basically just telling it to shut up) */ },
+                () => { /* ignore geolocation errors */ },
                 {
                     enableHighAccuracy: true,
                     timeout: Infinity,
@@ -152,16 +157,17 @@
         }
 
         /**
-         * Haversine formula (looked up on the internet (still dunno)) to compute distance between two lat/lon points.
+         * Haversine formula to compute distance between two lat/lon points.
          * @returns distance in meters
          */
         function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371000;                // Earth radius in meters
-            const toRad = d => d * Math.PI / 180; // used Math.PI for exact pi numerals
+            const toRad = d => d * Math.PI / 180;
             const dLat = toRad(lat2 - lat1),
                 dLon = toRad(lon2 - lon1);
             const a = Math.sin(dLat / 2) ** 2 +
-                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2; //im lost
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                Math.sin(dLon / 2) ** 2;
             return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         }
 
@@ -169,7 +175,7 @@
          * Request motion permissions on iOS, or attach listener immediately.
          */
         function enableMotion() {
-            if (DeviceMotionEvent?.requestPermission) {
+            if (DeviceMotionEvent?.requestPermission === 'function') {
                 DeviceMotionEvent.requestPermission()
                     .then(resp => { if (resp === 'granted') attachMotion(); })
                     .catch(() => { });
@@ -184,20 +190,17 @@
         function attachMotion() {
             window.addEventListener('devicemotion', ev => {
                 const rawX = ev.acceleration?.x || 0;
-                // Reject sudden jolts above threshold
                 const delta = Math.abs(rawX - lastAccelX);
                 const filt = delta > accelThreshold ? lastAccelX : rawX;
-                // Exponential smoothing for acceleration
                 const smoothX = accelAlpha * filt + (1 - accelAlpha) * lastAccelX;
                 lastAccelX = smoothX;
-                // Invoke C# ReportAccel(double) method
                 dotNetHelper?.invokeMethodAsync('ReportAccel', smoothX)
-                    .catch(() => { /* ignore */ });
+                    .catch(() => { });
             });
         }
     </script>
 
-    <!-- File-download & Share helper -->
+    <!-- File-download & Share helper (full code) -->
     <script>
         /**
          * Called from Blazor to export a CSV:
@@ -255,37 +258,35 @@
         };
     </script>
 
-    <!-- Geocode + Stormglass fetch by beach name -->
+    <!-- Geocode + Stormglass fetch by beach name (full code) -->
     <script>
         /**
-         * Given a beach name, geocode via Nominatim (Australia only),
+         * Given a beach name, geocode via Nominatim (AU only),
          * then fetch Stormglass data and store in localStorage["weather"].
          */
         async function fetchWeatherByBeach(beachName) {
             if (!beachName) return;
-
             try {
-                // 1. Geocode, restricting to Australia
+                // 1. Geocode (AU)
                 const geoRes = await fetch(
                     `https://nominatim.openstreetmap.org/search?format=json&countrycodes=au&limit=1&q=${encodeURIComponent(beachName)}`
                 );
                 const geoJson = await geoRes.json();
-                if (!geoJson.length) {
-                    console.error("No geocode result for", beachName);
-                    return;
-                }
+                if (!geoJson.length) return;
                 const { lat, lon } = geoJson[0];
 
                 // 2. Fetch Stormglass
                 const key = "b912148e-66b1-11f0-bc20-0242ac130006-b912154c-66b1-11f0-bc20-0242ac130006";
                 const url = `https://api.stormglass.io/v2/weather/point?lat=${lat}&lng=${lon}` +
-                    `&params=airTemperature,waterTemperature,windSpeed,windDirection,waveHeight&source=noaa`;
+                    `&params=airTemperature,waterTemperature,windSpeed,windDirection,waveHeight,swellHeight&source=noaa,sg,meteo`;
                 const res = await fetch(url, { headers: { Authorization: key } });
                 const json = await res.json();
                 const pt = json.hours?.[0];
                 if (!pt) return;
 
-                // 3. Store full weather object
+                const swellM = pt.swellHeight?.noaa ?? pt.swellHeight?.sg ?? pt.swellHeight?.meteo ?? 0;
+                const swellFt = Math.round(swellM * 3.28084);
+
                 const weather = {
                     time: new Date().toISOString(),
                     beach: beachName,
@@ -295,7 +296,8 @@
                     waterTemp: pt.waterTemperature?.noaa ?? 0,
                     windSpeed: pt.windSpeed?.noaa ?? 0,
                     windDir: pt.windDirection?.noaa ?? 0,
-                    waveHeight: pt.waveHeight?.noaa ? pt.waveHeight.noaa * 3.28084 : 0
+                    waveHeight: swellFt,
+                    totalWaves: pt.waveHeight?.noaa ? Math.round(pt.waveHeight.noaa * 3.28084) : 0
                 };
                 localStorage.setItem("weather", JSON.stringify(weather));
             } catch (e) {
