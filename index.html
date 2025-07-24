@@ -78,8 +78,8 @@
         let watchId, dotNetHelper = null, lastPosition = null;
         // Configuration constants
         const maxAccuracy = 20;       // maximum acceptable GPS accuracy in meters
-        const speedAlpha = 0.3;       // exponential smoothing factor for speed
-        const accelAlpha = 0.1;       // smoothing factor for acceleration
+        const speedAlpha = 0.6;       // exponential smoothing factor for speed
+        const accelAlpha = 0.05;       // smoothing factor for acceleration
         const accelThreshold = 0.5;   // acceleration delta threshold to reject sudden jolts
         // State for smoothing
         let lastSpeed = 0, lastAccelX = 0;
@@ -138,6 +138,8 @@
                     // Invoke C# ReportGps(double) method
                     dotNetHelper?.invokeMethodAsync('ReportGps', lastSpeed)
                         .catch(() => { /* swallow errors so i dont have to deal with it */ });
+                    //did have a debug statement in there to report to console
+                    // console.writeline("Report GPS failed")
                 },
                 () => { /* ignore geolocation errors (basically just telling it to shut up) */ },
                 {
@@ -185,6 +187,7 @@
                         }
                     })
                     .catch(e => console.error("❌ Motion permission request failed:", e));
+                    //added to report back to console to report if the request is failed - debug
             } else {
                 // Non‐iOS fallback
                 attachMotion();
@@ -212,7 +215,7 @@
     <!-- File-download & Share helper (full code) -->
     <script>
         /**
-         * Called from Blazor to export a CSV:
+         * Called from Blazor         *          *  to export a CSV:
          *  - On mobile: uses Web Share API to let user pick an app or Files location
          *  - Fallback: creates a hidden "download" link
          */
@@ -249,6 +252,7 @@
                 URL.revokeObjectURL(url);
             } catch (e) {
                 console.error('Download/share failed', e);
+                //left in as it reports to console as a fail
                 // Last-resort fallback
                 try {
                     const fallbackBlob = new Blob([atob(base64)], { type: 'text/csv' });
@@ -261,7 +265,7 @@
                     document.body.removeChild(fallbackLink);
                     URL.revokeObjectURL(fallbackUrl);
                 } catch {
-                    // give up silently
+                    // give up silently - did have a debug statement
                 }
             }
         };
@@ -272,6 +276,7 @@
         /*
          * Given a beach name, geocode via Nominatim (AU only),
          * then fetch Stormglass data and store in localStorage["weather"].
+         * Not gonna lie chat GPT carried, but i adjusted it to work with my program and also coded the actual bit in weather.razor
          */
         async function fetchWeatherByBeach(beachName) {
             if (!beachName) return;
