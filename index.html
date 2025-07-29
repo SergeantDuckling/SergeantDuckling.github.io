@@ -41,7 +41,122 @@
     <link href="css/app.css" rel="stylesheet" />
     <!-- Blazor‐generated component styles -->
     <link href="IRBSpeedApp.styles.css" rel="stylesheet" />
+
+    <!-- Chart.js for Data Analysis Graphing -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        /**
+         * Renders two line charts (speed & accel) into the given canvas IDs.
+         * Expects telemetryJson = JSON.stringify([{ Time, Speed, Accel }, ...]).
+         */
+        window.renderTelemetryCharts = (telemetryJson, speedCanvasId, accelCanvasId) => {
+            const data = JSON.parse(telemetryJson);
+            const labels = data.map(p => p.Time);
+            const speeds = data.map(p => p.Speed);
+            const accels = data.map(p => p.Accel);
+
+            // Destroy existing charts if any (to avoid over‑plotting)
+            if (window._speedChart) window._speedChart.destroy();
+            if (window._accelChart) window._accelChart.destroy();
+
+            const ctx1 = document.getElementById(speedCanvasId).getContext('2d');
+            window._speedChart = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Speed (km/h)',
+                        data: speeds,
+                        fill: false,
+                        tension: 0.3
+                    }]
+                },
+                options: { responsive: true }
+            });
+
+            const ctx2 = document.getElementById(accelCanvasId).getContext('2d');
+            window._accelChart = new Chart(ctx2, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Acceleration (m/s²)',
+                        data: accels,
+                        fill: false,
+                        tension: 0.3
+                    }]
+                },
+                options: { responsive: true }
+            });
+        };
+    </script>
+
+
+    <!-- *** DOWNLOAD HELPER IN HEAD BEFORE BLAZOR LOADS *** -->
+    <script>
+        /**
+         * Global function for Blazor JS interop.
+         */
+        function BlazorDownloadFile(filename, base64) {
+            // Ensure it's available on window
+            window.BlazorDownloadFile = BlazorDownloadFile;
+
+            (async () => {
+                try {
+                    // Decode base64 into a Uint8Array
+                    const byteChars = atob(base64);
+                    const len = byteChars.length;
+                    const bytes = new Uint8Array(len);
+                    for (let i = 0; i < len; i++) {
+                        bytes[i] = byteChars.charCodeAt(i);
+                    }
+                    const blob = new Blob([bytes], { type: 'application/octet-stream' });
+                    const file = new File([blob], filename, { type: 'application/octet-stream' });
+
+                    // Use the native share sheet if available (works best on iOS PWA)
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({ files: [file], title: filename, text: 'Select where to save your file' });
+                        return;
+                    }
+
+                    // Fallback: classic download link (Android PWA & desktop)
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                } catch (e) {
+                    console.error('Download/share failed', e);
+                    // Last‑ditch fallback
+                    const fallbackBlob = new Blob([atob(base64)], { type: 'application/octet-stream' });
+                    const fallbackUrl = URL.createObjectURL(fallbackBlob);
+                    const fallbackLink = document.createElement('a');
+                    fallbackLink.href = fallbackUrl;
+                    fallbackLink.download = filename;
+                    document.body.appendChild(fallbackLink);
+                    fallbackLink.click();
+                    document.body.removeChild(fallbackLink);
+                    URL.revokeObjectURL(fallbackUrl);
+                }
+            })();
+        }
+    </script>
+
+    <!-- Blazor WebAssembly runtime bootstrap script -->
+    <script src="_framework/blazor.webassembly.js"></script>
+
+
+
+    <!-- Quick console check -->
+    <script>
+        console.log('BlazorDownloadFile is', typeof BlazorDownloadFile);
+    </script>
 </head>
+
 <body>
     <!-- Root element for Blazor to render into -->
     <div id="app">
@@ -60,16 +175,12 @@
         <a class="dismiss">🗙</a>
     </div>
 
-    <!-- Blazor WebAssembly runtime bootstrap script -->
-    <script src="_framework/blazor.webassembly.js"></script>
-
-    <!-- Register Service Worker for PWA (i dont like this bit very much) -->
+    <!-- Register Service Worker for PWA (Temporarily disabled during testing) -->
     <script>
-        if ('serviceWorker' in navigator) {
-            // Attempt... (seemed that way too) to register the service worker without blocking on failure
-            navigator.serviceWorker.register('service-worker.js')
-                .catch(() => { });
-        }
+        // if ('serviceWorker' in navigator) {
+        //     navigator.serviceWorker.register('service-worker.js')
+        //         .catch(() => { });
+        // }
     </script>
 
     <!-- JavaScript Interop Helpers: GPS tracking, accelerometer, smoothing & strength -->
@@ -187,7 +298,7 @@
                         }
                     })
                     .catch(e => console.error("❌ Motion permission request failed:", e));
-                    //added to report back to console to report if the request is failed - debug
+                //added to report back to console to report if the request is failed - debug
             } else {
                 // Non‐iOS fallback
                 attachMotion();
@@ -210,65 +321,6 @@
                     .catch(() => { /* ignore */ });
             });
         }
-    </script>
-
-    <!-- File-download & Share helper (full code) -->
-    <script>
-        /**
-         * Called from Blazor         *          *  to export a CSV:
-         *  - On mobile: uses Web Share API to let user pick an app or Files location
-         *  - Fallback: creates a hidden "download" link
-         */
-        window.BlazorDownloadFile = async (filename, base64) => {
-            try {
-                // Decode base64 into a Uint8Array
-                const byteChars = atob(base64);
-                const len = byteChars.length;
-                const bytes = new Uint8Array(len).
-                    for(let i = 0; i < len; i++) {
-                    bytes[i] = byteChars.charCodeAt(i);
-                }
-                const blob = new Blob([bytes], { type: 'text/csv' });
-                const file = new File([blob], filename, { type: 'text/csv' });
-
-                // If the browser supports sharing files, invoke share sheet
-                if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                    await navigator.share({
-                        files: [file],
-                        title: filename,
-                        text: 'Select where to save your CSV'
-                    });
-                    return;
-                }
-
-                // Fallback: classic download link
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = filename;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-            } catch (e) {
-                console.error('Download/share failed', e);
-                //left in as it reports to console as a fail
-                // Last-resort fallback
-                try {
-                    const fallbackBlob = new Blob([atob(base64)], { type: 'text/csv' });
-                    const fallbackUrl = URL.createObjectURL(fallbackBlob);
-                    const fallbackLink = document.createElement('a');
-                    fallbackLink.href = fallbackUrl;
-                    fallbackLink.download = filename;
-                    document.body.appendChild(fallbackLink);
-                    fallbackLink.click();
-                    document.body.removeChild(fallbackLink);
-                    URL.revokeObjectURL(fallbackUrl);
-                } catch {
-                    // give up silently - did have a debug statement
-                }
-            }
-        };
     </script>
 
     <!-- Geocode + Stormglass fetch by beach name (full code) -->
