@@ -45,54 +45,6 @@
     <!-- Chart.js for Data Analysis Graphing -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <script>
-        /**
-         * Renders two line charts (speed & accel) into the given canvas IDs.
-         * Expects telemetryJson = JSON.stringify([{ Time, Speed, Accel }, ...]).
-         */
-        window.renderTelemetryCharts = (telemetryJson, speedCanvasId, accelCanvasId) => {
-            const data = JSON.parse(telemetryJson);
-            const labels = data.map(p => p.Time);
-            const speeds = data.map(p => p.Speed);
-            const accels = data.map(p => p.Accel);
-
-            // Destroy existing charts if any (to avoid over‑plotting)
-            if (window._speedChart) window._speedChart.destroy();
-            if (window._accelChart) window._accelChart.destroy();
-
-            const ctx1 = document.getElementById(speedCanvasId).getContext('2d');
-            window._speedChart = new Chart(ctx1, {
-                type: 'line',
-                data: {
-                    labels,
-                    datasets: [{
-                        label: 'Speed (km/h)',
-                        data: speeds,
-                        fill: false,
-                        tension: 0.3
-                    }]
-                },
-                options: { responsive: true }
-            });
-
-            const ctx2 = document.getElementById(accelCanvasId).getContext('2d');
-            window._accelChart = new Chart(ctx2, {
-                type: 'line',
-                data: {
-                    labels,
-                    datasets: [{
-                        label: 'Acceleration (m/s²)',
-                        data: accels,
-                        fill: false,
-                        tension: 0.3
-                    }]
-                },
-                options: { responsive: true }
-            });
-        };
-    </script>
-
-
     <!-- *** DOWNLOAD HELPER IN HEAD BEFORE BLAZOR LOADS *** -->
     <script>
         /**
@@ -148,8 +100,6 @@
 
     <!-- Blazor WebAssembly runtime bootstrap script -->
     <script src="_framework/blazor.webassembly.js"></script>
-
-
 
     <!-- Quick console check -->
     <script>
