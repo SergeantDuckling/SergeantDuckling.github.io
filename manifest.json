@@ -1,3 +1,7 @@
+//Name - manifest.json
+//    Purpose - the page that just handles icons
+//    last updated - 1/6/25
+//    author - Jack Borthwick-->
 {
   "name": "IRB Speed Testing App",
   "short_name": "IRB Speed",

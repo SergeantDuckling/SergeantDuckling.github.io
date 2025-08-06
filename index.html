@@ -11,6 +11,18 @@
     Your Favourite Student
 -->
 
+
+
+
+<!--Name - Index.HTML
+    Purpose - HTML of the code - ties all of the pages together into one
+    last updated - 30/7/25
+    author - Jack Borthwick-->
+
+
+
+<!--Debugging statements were left in as it doesnt affect the program at all-->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -66,7 +78,7 @@
                     const blob = new Blob([bytes], { type: 'application/octet-stream' });
                     const file = new File([blob], filename, { type: 'application/octet-stream' });
 
-                    // Use the native share sheet if available (works best on iOS PWA)
+                    // Use the native share sheet if available (works best on iOS PWA...i think)
                     if (navigator.canShare && navigator.canShare({ files: [file] })) {
                         await navigator.share({ files: [file], title: filename, text: 'Select where to save your file' });
                         return;
@@ -82,6 +94,7 @@
                     document.body.removeChild(link);
                     URL.revokeObjectURL(url);
                 } catch (e) {
+                    //debug statement for when it fails
                     console.error('Download/share failed', e);
                     // Last‑ditch fallback
                     const fallbackBlob = new Blob([atob(base64)], { type: 'application/octet-stream' });
@@ -94,14 +107,14 @@
                     document.body.removeChild(fallbackLink);
                     URL.revokeObjectURL(fallbackUrl);
                 }
-            })();
+            })(); //no clue why js needs this
         }
     </script>
 
     <!-- Blazor WebAssembly runtime bootstrap script -->
     <script src="_framework/blazor.webassembly.js"></script>
 
-    <!-- Quick console check -->
+    <!-- Quick console check for wether BLazor Download File is actually being registered as a function - debug-->
     <script>
         console.log('BlazorDownloadFile is', typeof BlazorDownloadFile);
     </script>
@@ -125,12 +138,12 @@
         <a class="dismiss">🗙</a>
     </div>
 
-    <!-- Register Service Worker for PWA (Temporarily disabled during testing) -->
+    <!-- Register Service Worker for PWA (was Temporarily disabled during testing when i believed the service worker was causing issues - debugging) -->
     <script>
-        // if ('serviceWorker' in navigator) {
-        //     navigator.serviceWorker.register('service-worker.js')
-        //         .catch(() => { });
-        // }
+         if ('serviceWorker' in navigator) {
+             navigator.serviceWorker.register('service-worker.js')
+                 .catch(() => { });
+         }
     </script>
 
     <!-- JavaScript Interop Helpers: GPS tracking, accelerometer, smoothing & strength -->
@@ -160,7 +173,8 @@
          */
         function startTracking(helper) {
             dotNetHelper = helper;
-            if (!navigator.geolocation) return;  // bail out if unsupported
+            if (!navigator.geolocation) console.error("bailed out - geolocation"); //debug statement for when it breaks as i was having issues
+            return;  // bail out if unsupported
 
             watchId = navigator.geolocation.watchPosition(
                 pos => {
@@ -202,7 +216,7 @@
                     //did have a debug statement in there to report to console
                     // console.writeline("Report GPS failed")
                 },
-                () => { /* ignore geolocation errors (basically just telling it to shut up) */ },
+                () => { /* ignore geolocation errors (basically just telling it to shut up) */ console.WriteLine("Geolocation error") },
                 {
                     enableHighAccuracy: true,
                     timeout: Infinity,
@@ -237,7 +251,7 @@
          * Request motion permissions on iOS, or attach listener immediately.
          */
         function enableMotion() {
-            // Always call requestPermission on iOS to force prompt
+            // Always call requestPermission on iOS and androud to force prompt
             if (typeof DeviceMotionEvent !== 'undefined' &&
                 typeof DeviceMotionEvent.requestPermission === 'function') {
 
@@ -247,7 +261,7 @@
                             attachMotion();
                         }
                     })
-                    .catch(e => console.error("❌ Motion permission request failed:", e));
+                    .catch(e => console.error(" Mo/tion permission request failed:", e));
                 //added to report back to console to report if the request is failed - debug
             } else {
                 // Non‐iOS fallback
@@ -299,10 +313,10 @@
                 const json = await res.json();
                 const pt = json.hours?.[0];
                 if (!pt) return;
-
+                //sets consts for swell meter and ft - doesnt actually get used anymore
                 const swellM = pt.swellHeight?.noaa ?? pt.swellHeight?.sg ?? pt.swellHeight?.meteo ?? 0;
                 const swellFt = Math.round(swellM * 3.28084);
-
+                //console.error(swellFt) - added for before i gave up on swell data as it was always reporting back over what it actually was
                 const weather = {
                     time: new Date().toISOString(),
                     beach: beachName,
@@ -318,6 +332,7 @@
                 localStorage.setItem("weather", JSON.stringify(weather));
             } catch (e) {
                 console.error("fetchWeatherByBeach failed", e);
+                //debug for when fetching weather failed
             }
         }
     </script>
