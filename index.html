@@ -64,11 +64,13 @@
          */
         function BlazorDownloadFile(filename, base64) {
             // Ensure it's available on window
+            
             window.BlazorDownloadFile = BlazorDownloadFile;
 
             (async () => {
                 try {
                     // Decode base64 into a Uint8Array
+                    //breakpoint steps through download sequence
                     const byteChars = atob(base64);
                     const len = byteChars.length;
                     const bytes = new Uint8Array(len);
@@ -85,6 +87,7 @@
                     }
 
                     // Fallback: classic download link (Android PWA & desktop)
+                    //to step through the fallback
                     const url = URL.createObjectURL(blob);
                     const link = document.createElement('a');
                     link.href = url;
@@ -97,6 +100,7 @@
                     //debug statement for when it fails
                     console.error('Download/share failed', e);
                     // Last‑ditch fallback
+                    //to step through the last ditch fallback
                     const fallbackBlob = new Blob([atob(base64)], { type: 'application/octet-stream' });
                     const fallbackUrl = URL.createObjectURL(fallbackBlob);
                     const fallbackLink = document.createElement('a');
@@ -172,7 +176,7 @@
          * Also reports GPS accuracy for signal‐strength bars.
          */
         function startTracking(helper) {
-            dotNetHelper = helper;
+            dotNetHelper = helper; //breakpoint added for when the program couldnt find the phones geolocation
             if (!navigator.geolocation) console.error("bailed out - geolocation"); //debug statement for when it breaks as i was having issues
             return;  // bail out if unsupported
 
@@ -188,7 +192,7 @@
                     if (accuracy > maxAccuracy) return;
 
                     // Compute raw speed in km/h, fallback via distance delta if no native speed
-                    let rawKmh = rawMps != null
+                    let rawKmh = rawMps != null //probably the most usefull breakpoint i used - steps through every part of the raw speed calculations for when the speed was no where near what it should have been.
                         ? rawMps * 3.6
                         : (() => {
                             if (!lastPosition) return 0;
@@ -255,7 +259,7 @@
             if (typeof DeviceMotionEvent !== 'undefined' &&
                 typeof DeviceMotionEvent.requestPermission === 'function') {
 
-                DeviceMotionEvent.requestPermission()
+                DeviceMotionEvent.requestPermission()  //where did the device location fail?
                     .then(response => {
                         if (response === 'granted') {
                             attachMotion();
