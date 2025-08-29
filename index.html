@@ -177,8 +177,12 @@
          */
         function startTracking(helper) {
             dotNetHelper = helper; //breakpoint added for when the program couldnt find the phones geolocation
-            if (!navigator.geolocation) console.error("bailed out - geolocation"); //debug statement for when it breaks as i was having issues
-            return;  // bail out if unsupported
+            if (!navigator.geolocation)
+            {
+                console.error("bailed out - geolocation"); //debug statement for when it breaks as i was having issues
+                return;  
+            }
+                // bail out if unsupported
 
             watchId = navigator.geolocation.watchPosition(
                 pos => {
