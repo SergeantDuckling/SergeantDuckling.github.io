@@ -10,17 +10,10 @@
     Cheers,
     Your Favourite Student
 -->
-
-
-
-
 <!--Name - Index.HTML
     Purpose - HTML of the code - ties all of the pages together into one
     last updated - 30/7/25
     author - Jack Borthwick-->
-
-
-
 <!--Debugging statements were left in as it doesnt affect the program at all-->
 
 <!DOCTYPE html>
@@ -28,7 +21,7 @@
 <head>
     <!-- Character encoding -->
     <meta charset="utf-8" />
-    <!-- Responsive viewport settings to ensure proper scaling on mobile -->
+    <!-- Responsive viewport settings for proper scaling on mobile -->
     <meta name="viewport"
           content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <!-- Browser tab title -->
@@ -64,7 +57,7 @@
          */
         function BlazorDownloadFile(filename, base64) {
             // Ensure it's available on window
-            
+
             window.BlazorDownloadFile = BlazorDownloadFile;
 
             (async () => {
@@ -99,7 +92,7 @@
                 } catch (e) {
                     //debug statement for when it fails
                     console.error('Download/share failed', e);
-                    // Last‑ditch fallback
+                    // Last-ditch fallback
                     //to step through the last ditch fallback
                     const fallbackBlob = new Blob([atob(base64)], { type: 'application/octet-stream' });
                     const fallbackUrl = URL.createObjectURL(fallbackBlob);
@@ -144,10 +137,10 @@
 
     <!-- Register Service Worker for PWA (was Temporarily disabled during testing when i believed the service worker was causing issues - debugging) -->
     <script>
-         if ('serviceWorker' in navigator) {
-             navigator.serviceWorker.register('service-worker.js')
-                 .catch(() => { });
-         }
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js')
+                .catch(() => { });
+        }
     </script>
 
     <!-- JavaScript Interop Helpers: GPS tracking, accelerometer, smoothing & strength -->
@@ -176,61 +169,136 @@
          * Also reports GPS accuracy for signal‐strength bars.
          */
         function startTracking(helper) {
-            dotNetHelper = helper; //breakpoint added for when the program couldnt find the phones geolocation
-            if (!navigator.geolocation)
-            {
-                console.error("bailed out - geolocation"); //debug statement for when it breaks as i was having issues
-                return;  
+            // keep a reference for .NET callbacks
+            dotNetHelper = helper;
+
+            // if the browser lacks geolocation, bail out cleanly
+            if (!navigator.geolocation) {
+                console.error("Geolocation not available in this browser/context.");
+                return;
             }
-                // bail out if unsupported
 
-            watchId = navigator.geolocation.watchPosition(
-                pos => {
-                    const { speed: rawMps, accuracy } = pos.coords;
-
-                    // Report GPS accuracy back to Blazor
-                    dotNetHelper?.invokeMethodAsync('ReportGpsAccuracy', accuracy)
-                        .catch(() => { });
-
-                    // Discard if accuracy worse than threshold
-                    if (accuracy > maxAccuracy) return;
-
-                    // Compute raw speed in km/h, fallback via distance delta if no native speed
-                    let rawKmh = rawMps != null //probably the most usefull breakpoint i used - steps through every part of the raw speed calculations for when the speed was no where near what it should have been.
-                        ? rawMps * 3.6
-                        : (() => {
-                            if (!lastPosition) return 0;
-                            const dt = (pos.timestamp - lastPosition.timestamp) / 1000;  // seconds
-                            const d = calculateDistance(
-                                lastPosition.coords.latitude,
-                                lastPosition.coords.longitude,
-                                pos.coords.latitude,
-                                pos.coords.longitude
-                            );
-                            return dt > 0 ? (d / dt) * 3.6 : 0;
-                        })();
-
-                    // Update last position for next delta calculation
-                    lastPosition = { coords: pos.coords, timestamp: pos.timestamp };
-
-                    // Exponential smoothing of speed
-                    let smoothKmh = speedAlpha * rawKmh + (1 - speedAlpha) * lastSpeed;
-                    // Clamp walking speeds (<1 km/h) to zero
-                    lastSpeed = smoothKmh < 1 ? 0 : smoothKmh;
-
-                    // Invoke C# ReportGps(double) method
-                    dotNetHelper?.invokeMethodAsync('ReportGps', lastSpeed)
-                        .catch(() => { /* swallow errors so i dont have to deal with it */ });
-                    //did have a debug statement in there to report to console
-                    // console.writeline("Report GPS failed")
-                },
-                err => { /* handle geolocation errors but don’t crash */ console.error("Geolocation error", err); },
-                {
-                    enableHighAccuracy: true,
-                    timeout: Infinity,
-                    maximumAge: 0
+            // Helper to start watchPosition (keeps same behaviour as before)
+            function startWatch() {
+                if (watchId) {
+                    // already watching
+                    return;
                 }
-            );
+
+                watchId = navigator.geolocation.watchPosition(
+                    pos => {
+                        const { speed: rawMps, accuracy } = pos.coords;
+
+                        // Report GPS accuracy back to Blazor (UI bars)
+                        dotNetHelper?.invokeMethodAsync('ReportGpsAccuracy', accuracy).catch(() => { });
+
+                        // Discard if accuracy worse than threshold
+                        if (accuracy > maxAccuracy) return;
+
+                        // Compute raw speed in km/h or use delta-distance fallback
+                        let rawKmh = rawMps != null
+                            ? rawMps * 3.6
+                            : (() => {
+                                if (!lastPosition) return 0;
+                                const dt = (pos.timestamp - lastPosition.timestamp) / 1000;
+                                const d = calculateDistance(
+                                    lastPosition.coords.latitude,
+                                    lastPosition.coords.longitude,
+                                    pos.coords.latitude,
+                                    pos.coords.longitude
+                                );
+                                return dt > 0 ? (d / dt) * 3.6 : 0;
+                            })();
+
+                        lastPosition = { coords: pos.coords, timestamp: pos.timestamp };
+
+                        // smooth speed
+                        let smoothKmh = speedAlpha * rawKmh + (1 - speedAlpha) * lastSpeed;
+                        lastSpeed = smoothKmh < 1 ? 0 : smoothKmh;
+
+                        // send speed to .NET
+                        dotNetHelper?.invokeMethodAsync('ReportGps', lastSpeed).catch(() => { });
+                    },
+                    err => {
+                        // Log error; do not crash the script
+                        console.error("watchPosition error:", err);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: Infinity,
+                        maximumAge: 0
+                    }
+                );
+            }
+
+            // Use Permissions API if available to inspect current state (helpful for debugging)
+            if (navigator.permissions && typeof navigator.permissions.query === 'function') {
+                navigator.permissions.query({ name: 'geolocation' }).then(permissionStatus => {
+                    console.log('geolocation permission state:', permissionStatus.state);
+
+                    if (permissionStatus.state === 'denied') {
+                        // Permission previously denied - warn the user
+                        alert('Location permission has been denied for this site. Please enable it in your browser settings.');
+                        return;
+                    }
+
+                    // To reliably trigger the permission prompt from a user action, call getCurrentPosition first.
+                    navigator.geolocation.getCurrentPosition(
+                        pos => {
+                            // we got a position -> start continuous watch
+                            lastPosition = { coords: pos.coords, timestamp: pos.timestamp };
+                            startWatch();
+                        },
+                        err => {
+                            console.error('getCurrentPosition failed:', err);
+                            if (err && err.code === 1) { // PERMISSION_DENIED
+                                alert('Location permission denied. Please enable it in browser settings and try again.');
+                            } else {
+                                // If temporary failure, still try watchPosition as it may succeed later
+                                startWatch();
+                            }
+                        },
+                        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+                    );
+
+                    // Also listen for permission changes (optional, for debugging/live updates)
+                    try {
+                        permissionStatus.onchange = () => {
+                            console.log('geolocation permission changed to', permissionStatus.state);
+                        };
+                    } catch (e) {
+                        // some browsers don't allow onchange assignment
+                    }
+                }).catch(err => {
+                    // Permissions API not reliable — fallback to calling getCurrentPosition to trigger prompt
+                    console.warn('permissions.query failed, falling back to direct getCurrentPosition', err);
+                    navigator.geolocation.getCurrentPosition(
+                        pos => {
+                            lastPosition = { coords: pos.coords, timestamp: pos.timestamp };
+                            startWatch();
+                        },
+                        err2 => {
+                            console.error('getCurrentPosition fallback failed:', err2);
+                            // still try to start watching; watchPosition may prompt on some browsers
+                            startWatch();
+                        },
+                        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+                    );
+                });
+            } else {
+                // No Permissions API available — call getCurrentPosition directly to trigger permission prompt.
+                navigator.geolocation.getCurrentPosition(
+                    pos => {
+                        lastPosition = { coords: pos.coords, timestamp: pos.timestamp };
+                        startWatch();
+                    },
+                    err => {
+                        console.error('getCurrentPosition (no Permissions API) failed:', err);
+                        startWatch(); // still try watching — some browsers will prompt on watchPosition
+                    },
+                    { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+                );
+            }
         }
 
         /**
@@ -272,7 +340,6 @@
                     .catch(e => console.error(" Mo/tion permission request failed:", e));
                 //added to report back to console to report if the request is failed - debug
             } else {
-                // Non‐iOS fallback
                 attachMotion();
             }
         }
@@ -282,13 +349,11 @@
          */
         function attachMotion() {
             window.addEventListener('devicemotion', ev => {
-                // Try acceleration, otherwise accelerationIncludingGravity
                 const rawX = ev.acceleration?.x ?? ev.accelerationIncludingGravity?.x ?? 0;
                 const delta = Math.abs(rawX - lastAccelX);
                 const filt = delta > accelThreshold ? lastAccelX : rawX;
                 const smoothX = accelAlpha * filt + (1 - accelAlpha) * lastAccelX;
                 lastAccelX = smoothX;
-                // Invoke C# ReportAccel(double) method
                 dotNetHelper?.invokeMethodAsync('ReportAccel', smoothX)
                     .catch(() => { /* ignore */ });
             });
