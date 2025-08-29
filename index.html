@@ -220,7 +220,7 @@
                     //did have a debug statement in there to report to console
                     // console.writeline("Report GPS failed")
                 },
-                () => { /* ignore geolocation errors (basically just telling it to shut up) */ console.WriteLine("Geolocation error") },
+                err => { /* handle geolocation errors but don’t crash */ console.error("Geolocation error", err); },
                 {
                     enableHighAccuracy: true,
                     timeout: Infinity,
