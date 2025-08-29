@@ -1,7 +1,7 @@
 {
   "entryAssembly": "IRBSpeedApp",
   "resources": {
-    "hash": "sha256-guBqpeCa11CiRJvNAFf5Adz4cJ9OkMaYRIH8R51wXdo=",
+    "hash": "sha256-c1+DLvKeWjF3H3d9rRhI6sD+JpRe6ACjqRwO2B86Ud4=",
     "runtime": {
       "dotnet.js": "sha256-eaJTmow4t8eE7FZMZR5Ja41JMOefGCbIYDTdpclGsac=",
       "dotnet.timezones.blat": "sha256-gbATD5HDsHYtW8vdPYh9iSBY4O5CjvMeCSF5xXWF1xo=",
@@ -48,7 +48,7 @@
       "System.Text.Json.dll": "sha256-jQjAeHCHGnclVZrpPRw9gVqr8CzIBOh8HmrHphRdSmY=",
       "System.dll": "sha256-X00CS76RYP+1bonecVV1Cn/0jOHeoVQUo1GS8UHpHpM=",
       "System.Private.CoreLib.dll": "sha256-FoF/CZOUbdASosofXVflPm6rdWrCG+Vvx0/ShWsjgQw=",
-      "IRBSpeedApp.dll": "sha256-e8YvNbjqqLT8cmLc+1wvAekuGu9w0zWXc4B0v1QnARE="
+      "IRBSpeedApp.dll": "sha256-belQ2f5Wp9jN/LbLQFAMmmfjnHFCLJxSWg/djF+4wIY="
     },
     "runtimeAssets": {
       "dotnet.wasm": {

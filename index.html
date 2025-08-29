@@ -390,6 +390,25 @@
                 //debug for when fetching weather failed
             }
         }
+        // Debug helper — paste into index.html or into console
+        window.__gpsDebug = {
+            checkFunctions: () => {
+                console.log('startTracking:', typeof startTracking);
+                console.log('registerDotNetHelper:', typeof registerDotNetHelper);
+                console.log('navigator.geolocation:', !!navigator.geolocation);
+                console.log('navigator.permissions:', !!navigator.permissions);
+            },
+            tryPrompt: () => {
+                // This will attempt a getCurrentPosition (should show prompt)
+                if (!navigator.geolocation) { console.error('No geolocation available'); return; }
+                navigator.geolocation.getCurrentPosition(
+                    pos => console.log('getCurrentPosition OK', pos),
+                    err => console.error('getCurrentPosition ERR', err),
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            }
+        };
+
     </script>
 
     <!-- Bootstrap JavaScript bundle for interactive components -->
